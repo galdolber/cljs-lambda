@@ -7,7 +7,7 @@
                  [org.clojure/clojurescript      "1.8.34"]
                  [org.clojure/core.async         "0.2.374"]
                  [org.clojure/tools.macro        "0.1.2"]
-                 [funcool/promesa                "1.1.1"]
+                 ;;[funcool/promesa                "1.1.1"]
                  [io.nervous/cljs-nodejs-externs "0.2.0"]]
   :plugins [[lein-doo       "0.1.7-SNAPSHOT"]
             [lein-npm       "0.6.0"]

@@ -3,7 +3,8 @@
             [cljs.core.async :as async :refer [<! >!]]
             [cljs.core.async.impl.protocols :as async-p]
             [cljs-lambda.context :as ctx]
-            [promesa.core :as p])
+            ;;[promesa.core :as p]
+            )
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (nodejs/enable-util-print!)
@@ -29,7 +30,7 @@
   (instance? js/Error x))
 
 (defn- invoke-async [f & args]
-  (p/promise
+  #_(p/promise
    (fn [resolve reject]
      (let [handle #(if (error? %) (reject %) (resolve %))]
        (try
@@ -54,7 +55,7 @@
 ```"
   [f error-handler]
   (fn [event context]
-    (p/catch
+    #_(p/catch
       (invoke-async f event context)
       #(invoke-async error-handler % event context))))
 
@@ -96,7 +97,7 @@ Failure:
   See [[macros/deflambda]] for an alternative approach to defining/export
   handler vars."
   [f & [{:keys [error-handler]}]]
-  (let [f (cond-> f error-handler (handle-errors error-handler))]
+  #_(let [f (cond-> f error-handler (handle-errors error-handler))]
     (wrap-lambda-fn
      (fn [event ctx]
        (-> (invoke-async f event ctx)
