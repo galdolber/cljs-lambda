@@ -2,7 +2,7 @@
   "Utilities for the local (e.g. automated tests, REPL interactions) invocation
   of Lambda handlers.  Local invocation is accomplished by passing handlers a
   stub context object which records completion signals."
-  (:require ;;[promesa.core :as p]
+  (:require [promesa.core :as p]
             [cljs-lambda.context :as ctx]
             [cljs.core.async :as async])
   (:require-macros [cljs.core.async.macros :refer [go]]))
@@ -43,7 +43,7 @@
           (update key-overrides :env stringify-keys))))
 
 (defn- channel->promise [ch]
-  #_(p/promise
+  (p/promise
    (fn [resolve reject]
      (go
        (let [[err result] (<! ch)]
