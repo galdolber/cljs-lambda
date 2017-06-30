@@ -17,8 +17,13 @@ $ lein new cljs-lambda my-lambda-project
 $ cd my-lambda-project
 $ lein cljs-lambda default-iam-role
 $ lein cljs-lambda deploy
+### 500ms delay via a promise (try also "delay-channel" and "delay-fail")
 $ lein cljs-lambda invoke work-magic \
-  '{"spell": "black", "delay-promise": "my-lambda-project-token"}'
+  '{"spell": "delay-promise", "msecs": 500, "magic-word": "my-lambda-project-token"}'
+... {:waited 500}
+### Get environment varibles
+$ lein cljs-lambda invoke work-magic \
+  '{"spell": "echo-env", "magic-word": "my-lambda-project-token"}'
 ...
 $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
 ```
@@ -28,9 +33,9 @@ $ lein cljs-lambda update-config work-magic :memory-size 256 :timeout 66
 ```clojure
 {...
  :cljs-lambda
- {:cljs-build-id "cljs-lambda-example"
-  :defaults {:role "arn:aws:iam::151963828411:role/..."}
+ {:defaults {:role "arn:aws:iam::151963828411:role/..."}
   :resource-dirs ["config"]
+  :managed-deps false
   :region ... ;; This'll default to your AWS CLI profile's region
   :functions
   [{:name   "dog-bark"
@@ -58,19 +63,25 @@ invoked.  An example:
  :description nil
  :create true
  :timeout 3 ;; seconds
- :memory-size 128} ;; MB
+ :memory-size 128 ;; MB
+ :vpc {:subnets [] :security-groups []}
+ :dead-letter "arn:..."
+ :env {"VAR_A" "VALUE_A"
+       "VAR_B" "VALUE_B"}}
 ```
+
+**NOTE:** Environment variables are case sensitive. You can provide `VAR_A` and `VAR_a`. Just be careful.
 
 The wiki's [plugin
 reference](https://github.com/nervous-systems/cljs-lambda/wiki/Plugin-Reference)
 has more details.
 
-## cljsbuild
+## Building Your Project
 
-The plugin depends on `lein-cljsbuild`, and assumes a `:cljsbuild` section in
-your `project.clj`.  A deployment or build via `cljs-lambda` invokes `cljsbuild` -
-it'll run either the first build in the `:builds` vector, or the one
-identified by `[:cljs-lambda :cljs-build-id]`.
+`lein-cljs-lambda` supports either invoking the Clojurescript compiler directly,
+or using `cljsbuild`.  If neither `:compiler` nor `:cljs-build-id` are present in
+a project's `:cljs-lambda` map, cljsbuild is assumed, and the default/first
+build will be used.
 
  - Source map support will be enabled if the `:source-map` key of the active build
 is `true`.

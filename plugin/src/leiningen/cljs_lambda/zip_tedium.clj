@@ -4,8 +4,12 @@
   (:import [java.io File]
            [java.nio.file Files LinkOption]
            [java.nio.file.attribute PosixFilePermission]
-           [org.apache.commons.compress.archivers.zip ZipArchiveEntry
-                                                      ZipArchiveOutputStream]))
+           [org.apache.commons.compress.archivers.zip
+            ZipArchiveEntry
+            ZipArchiveOutputStream]))
+
+;; I don't have time to explain
+(def ^:dynamic *print-files* false)
 
 (defn- get-posix-mode [file]
   (let [no-follow (into-array [LinkOption/NOFOLLOW_LINKS])
@@ -24,6 +28,9 @@
 (defn- zip-entry [zip-stream file & [path]]
   (let [path  (or path (.getPath file))
         entry (ZipArchiveEntry. file path)]
+    (when *print-files*
+      (println (.getAbsolutePath file))
+      (println path))
     (.setUnixMode entry (get-posix-mode file))
     (.putArchiveEntry zip-stream entry)
     (io/copy file zip-stream)
@@ -48,13 +55,18 @@
         (when-not (.isDirectory file)
           (zip-entry zip-stream file path))))))
 
-(defmulti  stuff-zip (fn [_ {:keys [optimizations]} _] optimizations))
+(defmulti  stuff-zip
+  (fn [_ {:keys [optimizations]} _]
+    (if (#{:simple :advanced} optimizations)
+      :single-file
+      :default)))
+
 (defmethod stuff-zip :default [zip-stream {:keys [output-dir]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-below zip-stream (io/file output-dir))
   (zip-below zip-stream (io/file "node_modules")))
 
-(defmethod stuff-zip :advanced [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
+(defmethod stuff-zip :single-file [zip-stream {:keys [output-to source-map]} {:keys [index-path]}]
   (zip-entry zip-stream (io/file index-path) "index.js")
   (zip-entry zip-stream (io/file output-to))
   (when (string? source-map)
@@ -63,13 +75,16 @@
 
 (defn write-zip [{:keys [output-dir] :as compiler-opts}
                  {:keys [project-name zip-name resource-dirs] :as spec}]
-  (let [zip-file (io/file output-dir zip-name)
-        path (.getAbsolutePath zip-file)]
+  (let [zip-file (if (spec :force-path)
+                   (io/file (spec :force-path))
+                   (io/file output-dir zip-name))
+        path     (.getAbsolutePath zip-file)]
     (log :verbose "Writing zip to" path)
     (.delete zip-file)
     (let [zip-stream (ZipArchiveOutputStream. zip-file)]
-      (stuff-zip zip-stream compiler-opts spec)
-      (doseq [d resource-dirs]
-        (zip-resources zip-stream (io/file d)))
+      (binding [*print-files* (spec :print-files)]
+        (stuff-zip zip-stream compiler-opts spec)
+        (doseq [d resource-dirs]
+          (zip-resources zip-stream (io/file d))))
       (.close zip-stream)
       path)))

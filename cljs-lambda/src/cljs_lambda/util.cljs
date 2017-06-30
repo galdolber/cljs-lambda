@@ -16,9 +16,13 @@
   keys `:aws-request-id`, `:client-context`, `:log-group-name`,
   `:log-stream-name` & `:function-name` - suitable for manipulation
   by [[context/done!]]  etc."
-  [f]
-  (fn [event ctx]
-    (f (js->clj event :keywordize-keys true)
+  [f & [{parse-input? :parse-input? :or {parse-input? true}}]]
+  (fn [event ctx & [cb]]
+    (when (fn? cb)
+      (set! (.. ctx -handler-callback)
+            (fn [err & [value]]
+              (cb (clj->js err) (clj->js value)))))
+    (f (if parse-input? (js->clj event :keywordize-keys true) event)
        (cond-> ctx
          (not (satisfies? ctx/ContextHandle ctx)) ctx/->context))))
 
@@ -28,7 +32,7 @@
 (defn- error? [x]
   (instance? js/Error x))
 
-(defn- invoke-async [f & args]
+(defn ^:no-doc invoke-async [f & args]
   (p/promise
    (fn [resolve reject]
      (let [handle #(if (error? %) (reject %) (resolve %))]
@@ -65,6 +69,9 @@
   Lambda-specific ([[context/fail!]], etc.) functionality within the body.
   Optional error handler behaves as [[handle-errors]].
 
+  If the handler was passed a callback by the Lambda harness, that function will
+  be used to signal completion, over the the context methods.
+
 Success:
 
 * Returns successful Promesa/Bluebird promise
@@ -95,11 +102,11 @@ Failure:
 
   See [[macros/deflambda]] for an alternative approach to defining/export
   handler vars."
-  [f & [{:keys [error-handler]}]]
+  [f & [{:keys [error-handler] :as opts}]]
   (let [f (cond-> f error-handler (handle-errors error-handler))]
     (wrap-lambda-fn
      (fn [event ctx]
-       (-> (invoke-async f event ctx)
-           (p/branch
-             (partial ctx/succeed! ctx)
-             (partial ctx/fail!    ctx)))))))
+       (let [cb (or (:handler-callback ctx) (partial ctx/done! ctx))]
+         (-> (invoke-async f event ctx)
+             (p/branch (partial cb nil) cb))))
+     opts)))
